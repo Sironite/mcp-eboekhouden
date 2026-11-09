@@ -1,5 +1,8 @@
 # mcp-eboekhouden
 
+[![CI](https://github.com/Sironite/mcp-eboekhouden/actions/workflows/ci.yml/badge.svg)](https://github.com/Sironite/mcp-eboekhouden/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 MCP server (stdio) that lets an AI assistant such as Claude keep the books in
 [e-Boekhouden](https://www.e-boekhouden.nl) through the official
 [e-Boekhouden REST API](https://api.e-boekhouden.nl/scalar/).
@@ -28,9 +31,9 @@ by hand in e-Boekhouden.
 
 ### Safeguards on `create_mutation`
 
-- **Marker**: every description, on the mutation and on each row, contains
-  `[claude]`, so mutations made through this server are easy to find in
-  e-Boekhouden. If the text does not contain it yet, the server puts it in front; a
+- **Marker**: every description, on the mutation and on each row, contains a
+  marker (`[claude]` by default, set with `EBOEKHOUDEN_MARKER`), so mutations made
+  through this server are easy to find in e-Boekhouden. If the text does not contain it yet, the server puts it in front; a
   marker at the end (`... [claude]`) is kept as is. The mutation description holds
   50 characters including the marker.
 - **Validation before sending**: date (real calendar date), amounts (max 2
@@ -52,6 +55,9 @@ by hand in e-Boekhouden.
 
 ### Limits
 
+- **Dutch administrations only**: the VAT codes, VAT return boxes and
+  validation cover the Dutch (NL) VAT codes. Belgian administrations (`BE_*` VAT
+  codes) are not supported.
 - **No attachments**: the API has no endpoint for receipts or invoice PDFs.
 - **Reverse-charged VAT** in `vat_quarter_summary` is estimated at 21%, because
   the API reports 0 VAT for those rows. This is verified for `BI_EU_INK`; for
@@ -76,6 +82,7 @@ by hand in e-Boekhouden.
 | ------------------------------- | -------- | ------------------------------------------------------------------------------------ |
 | `EBOEKHOUDEN_API_TOKEN`         | yes      | e-Boekhouden API token                                                               |
 | `EBOEKHOUDEN_API_TOKEN_EXPIRES` | no       | Token expiry (Unix seconds or ISO date); tool results warn from 30 days before       |
+| `EBOEKHOUDEN_MARKER`            | no       | Marker added to mutation descriptions (default `[claude]`; 1-20 characters)          |
 | `EBOEKHOUDEN_SOURCE`            | no       | Integration identifier for the session (default `mcp_eb`; 1-10 letters, digits, `_`) |
 | `EBOEKHOUDEN_AUDIT_LOG`         | no       | Absolute path of the audit log (`.jsonl`)                                            |
 
@@ -85,17 +92,29 @@ process starts; the token is never written to disk.
 
 ## Setup
 
+From npm (no build needed):
+
+```sh
+EBOEKHOUDEN_API_TOKEN=... npx -y @sironite/mcp-eboekhouden
+```
+
+From source:
+
 ```sh
 npm install          # also enables the git hooks in .githooks/
 npm run build
 cp .env.op.example .env.op   # then edit the op:// references
 ```
 
-Run it directly:
+Run it with secrets from 1Password:
 
 ```sh
-op run --env-file=.env.op -- node dist/index.js
+scripts/start-with-op.sh            # uses ./.env.op; or pass another env file
 ```
+
+`start-with-op.sh` checks first that the 1Password CLI is signed in and exits
+with a clear message if it is not, instead of hanging on an interactive prompt.
+It then runs `op run --env-file=<env file> -- node dist/index.js`.
 
 ### Register in Claude Code
 
@@ -104,8 +123,7 @@ out of every other folder):
 
 ```sh
 claude mcp add -s local eboekhouden -e OP_BIOMETRIC_UNLOCK_ENABLED=true -- \
-  op run --env-file="/path/to/mcp-eboekhouden/.env.op" -- \
-  node "/path/to/mcp-eboekhouden/dist/index.js"
+  /path/to/mcp-eboekhouden/scripts/start-with-op.sh /path/to/mcp-eboekhouden/.env.op
 ```
 
 `OP_BIOMETRIC_UNLOCK_ENABLED=true` works around a macOS privacy restriction that
@@ -126,7 +144,7 @@ The script clones or updates the repository (from `MCP_EBOEKHOUDEN_REPO`, or the
 `origin` of this checkout), builds it and keeps its `.env.op` in sync with
 `.env.op.example`: missing keys are appended, existing lines are never changed, and
 commented optional keys are only reported. Register the production copy as shown
-above, pointing at its `.env.op` and `dist/index.js`.
+above, pointing at its `scripts/start-with-op.sh` and `.env.op`.
 
 ## Development
 
@@ -139,7 +157,8 @@ npm run secrets:scan  # gitleaks over git history and working tree
 ```
 
 Git hooks (`.githooks/`): `pre-commit` runs gitleaks, `pre-push` blocks direct
-pushes to `main`. CI runs gitleaks over the full history, lint, tests and build.
+pushes to `main` except fast-forwards to a pull request branch (see
+[CONTRIBUTING.md](CONTRIBUTING.md)). CI runs gitleaks over the full history, lint, tests and build.
 
 API research notes (endpoints, fields, error codes, observed behaviour) are in
 [`docs/api-notes.md`](docs/api-notes.md).
