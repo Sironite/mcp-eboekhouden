@@ -1,9 +1,35 @@
 {
-  "name": "mcp-eboekhouden",
+  "name": "@sironite/mcp-eboekhouden",
   "version": "0.1.0",
-  "private": true,
   "description": "MCP server for bookkeeping in e-Boekhouden via the REST API",
   "license": "MIT",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "e-boekhouden",
+    "bookkeeping",
+    "accounting"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sironite/mcp-eboekhouden.git"
+  },
+  "homepage": "https://github.com/Sironite/mcp-eboekhouden#readme",
+  "bugs": {
+    "url": "https://github.com/Sironite/mcp-eboekhouden/issues"
+  },
+  "files": [
+    "dist/**/*.js",
+    "scripts/start-with-op.sh",
+    ".env.op.example",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "mcp-eboekhouden": "dist/index.js"
@@ -21,7 +47,8 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "secrets:scan": "gitleaks git --redact --no-banner --verbose . && gitleaks dir --redact --no-banner --verbose .",
     "install:prod": "sh scripts/install-prod.sh",
-    "test:scripts": "sh scripts/test-sync-env.sh"
+    "test:scripts": "sh scripts/test-sync-env.sh && sh scripts/test-pre-push.sh && sh scripts/test-start-with-op.sh",
+    "prepublishOnly": "npm run lint && npm test && npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
