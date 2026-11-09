@@ -2,6 +2,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   auditLogPath,
+  mutationMarker,
+  packageVersion,
   readApiToken,
   readTokenExpiry,
   sessionSource,
@@ -46,6 +48,17 @@ describe("config", () => {
     expect(sessionSource({ EBOEKHOUDEN_SOURCE: "my_app" })).toBe("my_app");
     expect(() => sessionSource({ EBOEKHOUDEN_SOURCE: "far-too-long-name" })).toThrow("1-10");
     expect(() => sessionSource({ EBOEKHOUDEN_SOURCE: "a-b" })).toThrow("1-10");
+  });
+
+  it("uses a configurable marker", () => {
+    expect(mutationMarker({})).toBe("[claude]");
+    expect(mutationMarker({ EBOEKHOUDEN_MARKER: " [ai] " })).toBe("[ai]");
+    expect(() => mutationMarker({ EBOEKHOUDEN_MARKER: "x".repeat(21) })).toThrow("1-20");
+    expect(() => mutationMarker({ EBOEKHOUDEN_MARKER: "a\u0007b" })).toThrow("printable");
+  });
+
+  it("reads the version from package.json", () => {
+    expect(packageVersion()).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it("requires the API token", () => {

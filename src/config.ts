@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,8 +23,29 @@ export function sessionSource(env: NodeJS.ProcessEnv = process.env): string {
   return configured;
 }
 
-/** Prefix added to the description of every mutation created through this server. */
-export const MUTATION_MARKER = "[claude]";
+/** Default marker added to the description of every mutation created through this server. */
+export const DEFAULT_MUTATION_MARKER = "[claude]";
+
+/**
+ * Marker for mutations created through this server. EBOEKHOUDEN_MARKER overrides
+ * the default; it must be 1-20 printable characters.
+ */
+export function mutationMarker(env: NodeJS.ProcessEnv = process.env): string {
+  const configured = env["EBOEKHOUDEN_MARKER"]?.trim();
+  if (!configured) return DEFAULT_MUTATION_MARKER;
+  if (configured.length > 20 || hasControlChar(configured)) {
+    throw new Error("EBOEKHOUDEN_MARKER must be 1-20 printable characters.");
+  }
+  return configured;
+}
+
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
 
 /** Hard limit of the mutation description field (POST /v1/mutation). */
 export const MUTATION_DESCRIPTION_MAX = 50;
@@ -40,6 +62,18 @@ export const PAGE_SIZE = 2000;
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const DEFAULT_AUDIT_LOG_PATH = path.join(projectRoot, "logs", "audit.jsonl");
+
+/** Version from package.json (src/ and dist/ both sit one level below the project root). */
+export function packageVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(path.join(projectRoot, "package.json"), "utf8")) as {
+      version?: unknown;
+    };
+    return typeof pkg.version === "string" ? pkg.version : "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 
 /**
  * Audit log location. EBOEKHOUDEN_AUDIT_LOG may point elsewhere (for example the

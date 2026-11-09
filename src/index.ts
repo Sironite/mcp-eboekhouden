@@ -2,7 +2,13 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { FileAuditLogger } from "./audit.js";
 import { EBoekhoudenClient } from "./client.js";
-import { auditLogPath, readApiToken, readTokenExpiry, sessionSource } from "./config.js";
+import {
+  auditLogPath,
+  mutationMarker,
+  readApiToken,
+  readTokenExpiry,
+  sessionSource,
+} from "./config.js";
 import { createServer } from "./server.js";
 
 async function main(): Promise<void> {
@@ -12,6 +18,7 @@ async function main(): Promise<void> {
   });
   const server = createServer(client, new FileAuditLogger(auditLogPath()), {
     tokenExpiresAt: readTokenExpiry(),
+    marker: mutationMarker(),
   });
   await server.connect(new StdioServerTransport());
 }

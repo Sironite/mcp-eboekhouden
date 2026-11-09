@@ -3,7 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AuditLogger } from "./audit.js";
 import type { EBoekhoudenClient, Query } from "./client.js";
-import { MUTATION_MARKER, tokenExpiryWarning } from "./config.js";
+import { DEFAULT_MUTATION_MARKER, packageVersion, tokenExpiryWarning } from "./config.js";
 import { EBoekhoudenApiError, ValidationError } from "./errors.js";
 import { createMutation } from "./mutations.js";
 import { createRelation, updateRelation } from "./relations.js";
@@ -67,6 +67,8 @@ const WRITE = { readOnlyHint: false, destructiveHint: false, openWorldHint: true
 
 export interface ServerOptions {
   tokenExpiresAt?: Date | undefined;
+  /** Marker added to mutation descriptions (default: DEFAULT_MUTATION_MARKER). */
+  marker?: string;
   now?: () => Date;
 }
 
@@ -75,7 +77,8 @@ export function createServer(
   audit: AuditLogger,
   options: ServerOptions = {},
 ): McpServer {
-  const server = new McpServer({ name: "mcp-eboekhouden", version: "0.1.0" });
+  const server = new McpServer({ name: "mcp-eboekhouden", version: packageVersion() });
+  const marker = options.marker ?? DEFAULT_MUTATION_MARKER;
   const now = options.now ?? (() => new Date());
 
   /** Runs a tool and appends a warning when the API token is about to expire. */
@@ -314,7 +317,7 @@ export function createServer(
       description: [
         "Create a bookkeeping mutation in e-Boekhouden.",
         "Types: invoice_received (purchase invoice), invoice_sent (sales invoice), invoice_payment_received, invoice_payment_sent, money_received, money_sent, general_journal (memoriaal).",
-        `The description is prefixed with '${MUTATION_MARKER} '.`,
+        `Every description (header and rows) gets the marker '${marker}' unless it already contains it.`,
         "Ledgers, relations, VAT codes, amounts and the date are validated before anything is sent.",
         "If a matching mutation already exists (same type, date, relation, total amount and invoice number, or description when there is no invoice number) it is returned instead of creating a new one.",
         "If another mutation has the same type, date, relation and amount but a different invoice number or description (for example one entered by hand), the call is rejected as a possible duplicate; only after checking it, call again with confirmNotDuplicate: true.",
@@ -323,7 +326,7 @@ export function createServer(
       inputSchema: createMutationInput.shape,
       annotations: { ...WRITE, idempotentHint: true },
     },
-    (args) => run(() => createMutation(client, audit, args)),
+    (args) => run(() => createMutation(client, audit, args, { marker })),
   );
 
   server.registerTool(

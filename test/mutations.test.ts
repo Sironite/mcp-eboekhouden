@@ -248,6 +248,24 @@ describe("create_mutation marker and payload", () => {
     ]);
   });
 
+  it("uses a custom marker when configured", async () => {
+    const api = fakeApi((req) => {
+      const m = /^\/v1\/ledger\/(\d+)$/.exec(req.url.pathname);
+      if (m) return json(200, { id: Number(m[1]), category: m[1] === "30" ? "DEB" : "VW" });
+      if (req.url.pathname === "/v1/relation/5") return json(200, { id: 5, inactive: false });
+      if (req.url.pathname === "/v1/mutation" && req.method === "GET")
+        return json(200, { items: [] });
+      if (req.url.pathname === "/v1/mutation" && req.method === "POST") return json(201, { id: 1 });
+      return undefined;
+    });
+    const result = await createMutation(api.client, new MemoryAudit(), salesInvoice, {
+      marker: "[ai]",
+    });
+    expect(result.description).toBe("[ai] Consultancy oktober");
+    const body = api.calls("POST", "/v1/mutation")[0]?.body as { rows: { description: string }[] };
+    expect(body.rows[0]?.description).toBe("[ai] Consultancy oktober");
+  });
+
   it("rejects a row description that is too long with the marker", async () => {
     const admin = administration();
     const issues = await rejected(

@@ -1,6 +1,6 @@
 import type { AuditLogger } from "./audit.js";
 import type { EBoekhoudenClient } from "./client.js";
-import { MUTATION_DESCRIPTION_MAX, MUTATION_MARKER } from "./config.js";
+import { DEFAULT_MUTATION_MARKER, MUTATION_DESCRIPTION_MAX } from "./config.js";
 import { EBoekhoudenApiError, ValidationError } from "./errors.js";
 import { createMutationInput, MUTATION_TYPES, type CreateMutationInput } from "./schemas.js";
 import { VAT_CODES_WITH_AMOUNT, vatCodeInfo } from "./vat.js";
@@ -64,27 +64,35 @@ export function round2(value: number): number {
 const ROW_DESCRIPTION_MAX = 200;
 
 /** Adds the marker in front unless the text already contains it (at the start or the end). */
-export function markedDescription(description: string | undefined): string {
+export function markedDescription(
+  description: string | undefined,
+  marker: string = DEFAULT_MUTATION_MARKER,
+): string {
   const text = description?.trim() ?? "";
-  if (text.includes(MUTATION_MARKER)) return text;
-  return text.length > 0 ? `${MUTATION_MARKER} ${text}` : MUTATION_MARKER;
+  if (text.includes(marker)) return text;
+  return text.length > 0 ? `${marker} ${text}` : marker;
 }
 
 /** Checks that need no API call. Returns a list of problems (empty when valid). */
-export function validateMutationLocally(input: CreateMutationInput): string[] {
+export function validateMutationLocally(
+  input: CreateMutationInput,
+  marker: string = DEFAULT_MUTATION_MARKER,
+): string[] {
   const issues: string[] = [];
   const type = MUTATION_TYPES[input.type];
 
-  const description = markedDescription(input.description);
+  const description = markedDescription(input.description, marker);
   if (description.length > MUTATION_DESCRIPTION_MAX) {
     issues.push(
-      `description is too long: with the '${MUTATION_MARKER} ' prefix it is ${description.length} characters, max is ${MUTATION_DESCRIPTION_MAX}`,
+      `description is too long: with the '${marker} ' marker it is ${description.length} characters, max is ${MUTATION_DESCRIPTION_MAX}`,
     );
   }
 
   input.rows.forEach((row, i) => {
     const at = `rows[${i}]`;
-    if (markedDescription(row.description ?? input.description).length > ROW_DESCRIPTION_MAX) {
+    if (
+      markedDescription(row.description ?? input.description, marker).length > ROW_DESCRIPTION_MAX
+    ) {
       issues.push(`${at}.description is too long with the marker (max ${ROW_DESCRIPTION_MAX})`);
     }
     const vat = vatCodeInfo(row.vatCode);
@@ -232,6 +240,7 @@ export async function checkDuplicates(
 export function toApiPayload(
   input: CreateMutationInput,
   description: string,
+  marker: string = DEFAULT_MUTATION_MARKER,
 ): Record<string, unknown> {
   return {
     type: MUTATION_TYPES[input.type],
@@ -249,7 +258,7 @@ export function toApiPayload(
       amount: row.amount,
       vatAmount: row.vatAmount,
       // Rows carry the marker too; without a row description the header text is used.
-      description: markedDescription(row.description ?? input.description),
+      description: markedDescription(row.description ?? input.description, marker),
       invoiceNumber: row.invoiceNumber,
       relationId: row.relationId,
       costCenterId: row.costCenterId,
@@ -261,7 +270,9 @@ export async function createMutation(
   client: EBoekhoudenClient,
   audit: AuditLogger,
   rawInput: unknown,
+  options: { marker?: string } = {},
 ): Promise<CreateMutationResult> {
+  const marker = options.marker ?? DEFAULT_MUTATION_MARKER;
   const parsed = createMutationInput.safeParse(rawInput);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`);
@@ -269,10 +280,10 @@ export async function createMutation(
     throw new ValidationError(issues);
   }
   const input = parsed.data;
-  const description = markedDescription(input.description);
+  const description = markedDescription(input.description, marker);
 
   try {
-    const issues = validateMutationLocally(input);
+    const issues = validateMutationLocally(input, marker);
     if (issues.length === 0) issues.push(...(await validateMutationRemotely(client, input)));
     if (issues.length > 0) throw new ValidationError(issues);
 
@@ -302,7 +313,7 @@ export async function createMutation(
 
     const created = await client.post<{ id: number }>(
       "/v1/mutation",
-      toApiPayload(input, description),
+      toApiPayload(input, description, marker),
     );
     await audit.write({
       tool: "create_mutation",
