@@ -2,8 +2,10 @@ name: CI
 
 on:
   pull_request:
+  # Every branch, so a change can be checked before main is fast-forwarded to it
+  # without opening a pull request.
   push:
-    branches: [main]
+    branches: ["**"]
 
 permissions:
   contents: read
