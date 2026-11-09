@@ -1,11 +1,29 @@
 #!/usr/bin/env sh
-# Blocks direct pushes to main; changes go through a pull request.
-# (Server-side branch protection needs GitHub Pro for private repositories.)
+# Blocks direct pushes to main. The one exception is a fast-forward of main to
+# a commit that already exists on another remote branch (a reviewed pull request
+# branch): that merges the PR without creating a merge commit.
+#
+#   git fetch origin
+#   git merge --ff-only origin/<pr-branch>
+#   git push origin main
 set -eu
 
+remote="${1:-origin}"
+zero="0000000000000000000000000000000000000000"
+
 while read -r local_ref local_sha remote_ref remote_sha; do
-  if [ "$remote_ref" = "refs/heads/main" ]; then
-    echo "pre-push: direct push to main is blocked; open a pull request instead." >&2
+  [ "$remote_ref" = "refs/heads/main" ] || continue
+
+  if [ "$local_sha" = "$zero" ] || [ "$remote_sha" = "$zero" ]; then
+    echo "pre-push: deleting or creating main is blocked." >&2
+    exit 1
+  fi
+  if ! git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+    echo "pre-push: push to main is not a fast-forward; blocked." >&2
+    exit 1
+  fi
+  if [ -z "$(git branch -r --contains "$local_sha" | grep -v -E "^[[:space:]]*$remote/(main|HEAD)( |$)" || true)" ]; then
+    echo "pre-push: direct push to main is blocked; open a pull request and fast-forward to its branch." >&2
     exit 1
   fi
 done
