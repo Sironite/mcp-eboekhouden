@@ -1,0 +1,43 @@
+{
+  "name": "mcp-eboekhouden",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server for bookkeeping in e-Boekhouden via the REST API",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "mcp-eboekhouden": "dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "prepare": "git config core.hooksPath .githooks || true",
+    "secrets:scan": "gitleaks git --redact --no-banner --verbose . && gitleaks dir --redact --no-banner --verbose .",
+    "install:prod": "sh scripts/install-prod.sh",
+    "test:scripts": "sh scripts/test-sync-env.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.4"
+  }
+}

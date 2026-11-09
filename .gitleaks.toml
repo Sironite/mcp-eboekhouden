@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated and third-party files"
+paths = ['''node_modules/''', '''dist/''', '''coverage/''']
